@@ -46,6 +46,7 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [touchDistance, setTouchDistance] = useState(0);
   const [preloadedImages, setPreloadedImages] = useState<HTMLImageElement[]>([]);
+  const [dragDelta, setDragDelta] = useState(0); // Track horizontal drag distance
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
 
@@ -111,31 +112,35 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
     e.preventDefault();
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
+    setDragDelta(0); // Reset drag delta on start
   };
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!isDragging) return;
     
+    const deltaX = e.clientX - dragStart.x;
+    
     if (scale > 1) {
       // When zoomed in, drag moves the image
       setPosition({
-        x: position.x + (e.clientX - dragStart.x),
+        x: position.x + deltaX,
         y: position.y + (e.clientY - dragStart.y)
       });
     } else {
-      // When at normal zoom, horizontal drag changes images
-      const deltaX = e.clientX - dragStart.x;
-      // Store the delta for smoother navigation
-      if (Math.abs(deltaX) > 80) {
-        if (deltaX > 0) {
+      // When at normal zoom, track horizontal drag for image navigation
+      setDragDelta(dragDelta + deltaX);
+      
+      // Navigate to next/previous image when drag exceeds threshold
+      const dragThreshold = 50; // Adjust this value as needed
+      
+      if (Math.abs(dragDelta) > dragThreshold) {
+        if (dragDelta > 0) {
           goToPrevious();
         } else {
           goToNext();
         }
-        // Reset the dragging state and position
-        setIsDragging(false);
-        setDragStart({ x: e.clientX, y: e.clientY });
-        return;
+        // Reset drag delta after navigation
+        setDragDelta(0);
       }
     }
     
@@ -144,6 +149,7 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    setDragDelta(0); // Reset drag delta on release
   };
 
   // Touch handling for mobile devices
@@ -152,6 +158,7 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
       // Single touch - for dragging
       setIsDragging(true);
       setDragStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setDragDelta(0); // Reset drag delta on start
     } else if (e.touches.length === 2) {
       // Two touches - for pinch zooming
       setTouchDistance(getTouchDistance(e.touches));
@@ -163,24 +170,29 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
 
     if (e.touches.length === 1 && isDragging) {
       const touch = e.touches[0];
+      const deltaX = touch.clientX - dragStart.x;
       
       if (scale > 1) {
         // When zoomed in, drag moves the image
         setPosition({
-          x: position.x + (touch.clientX - dragStart.x),
+          x: position.x + deltaX,
           y: position.y + (touch.clientY - dragStart.y)
         });
       } else {
-        // When at normal zoom, horizontal drag changes images
-        const deltaX = touch.clientX - dragStart.x;
-        if (Math.abs(deltaX) > 50) { // Lower threshold for touch
-          if (deltaX > 0) {
+        // When at normal zoom, track drag for image navigation
+        setDragDelta(dragDelta + deltaX);
+        
+        // Navigate when drag exceeds threshold
+        const dragThreshold = 50; // Lower threshold for touch
+        
+        if (Math.abs(dragDelta) > dragThreshold) {
+          if (dragDelta > 0) {
             goToPrevious();
           } else {
             goToNext();
           }
-          setDragStart({ x: touch.clientX, y: touch.clientY });
-          return;
+          // Reset after navigation
+          setDragDelta(0);
         }
       }
       
@@ -217,6 +229,7 @@ export const ImageViewer = ({ images }: ImageViewerProps) => {
   const handleTouchEnd = () => {
     setIsDragging(false);
     setTouchDistance(0);
+    setDragDelta(0); // Reset drag delta on release
   };
 
   // Zoom with mouse wheel
